@@ -30,6 +30,9 @@ X-XR-Plugin-Exec=$bin run
 X-XR-Plugin-Comment=Pink-noise masking for the headset audio output
 EOF
 
+# The widget ships its own copy of the icon (packages must be self-contained).
+cp "$repo/vr_noise_mask/assets/icon.svg" "$repo/plasmoid/contents/icon.svg"
+
 if command -v kpackagetool6 >/dev/null; then
     kpackagetool6 -t Plasma/Applet -u "$repo/plasmoid" 2>/dev/null \
         || kpackagetool6 -t Plasma/Applet -i "$repo/plasmoid"

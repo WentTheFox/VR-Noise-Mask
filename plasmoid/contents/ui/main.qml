@@ -23,7 +23,16 @@ PlasmoidItem {
                    : active ? "Playing at " + volume + "%"
                    : "Waiting for device"
 
-    Plasmoid.icon: active && enabled ? "audio-volume-medium" : "audio-volume-muted"
+    Plasmoid.icon: Qt.resolvedUrl("../icon.svg")
+
+    compactRepresentation: MouseArea {
+        onClicked: root.expanded = !root.expanded
+        Kirigami.Icon {
+            anchors.fill: parent
+            source: Plasmoid.icon
+            opacity: root.active && root.enabled ? 1.0 : 0.4  // dim when silent
+        }
+    }
 
     P5Support.DataSource {
         id: exec
