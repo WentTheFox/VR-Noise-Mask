@@ -1,5 +1,4 @@
-"""Pink noise generation and the dB-based volume dial, shared by the
-standalone tray app's history and now this GUI's Audio tab.
+"""Pink noise generation and the dB-based volume dial, used by the generator.
 
 Volume is a perceptual (dB) scale, not linear amplitude: hearing is roughly
 logarithmic, so a linear 0.30 multiplier sounds much louder than "30%"

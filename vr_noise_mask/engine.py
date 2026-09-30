@@ -1,13 +1,12 @@
 """Owns the PyAudio stream lifecycle: finds the configured output device,
 opens/moves/reopens a stream as it comes and goes, and generates the noise.
 
-On Linux, output is routed through PipeWire's Pulse-compat layer (the ALSA
-"pulse" device) and then explicitly moved to the matching sink via
-`pactl move-sink-input` -- opening the raw ALSA hardware device directly
-would fight PipeWire for exclusive access to the card.
+On Linux, output goes through PipeWire's Pulse-compat layer (the ALSA "pulse"
+device) and is then moved to the matching sink via `pactl move-sink-input` --
+opening the raw ALSA hardware device would fight PipeWire for the card.
 
-On Windows, output devices are real distinct WASAPI endpoints, so normal
-PortAudio device selection by name is used instead.
+On Windows, output devices are distinct WASAPI endpoints, so normal PortAudio
+device selection by name is used.
 """
 import json
 import os
@@ -34,7 +33,7 @@ def pactl_list_sinks():
         data = json.loads(out)
         return [(s["name"], s.get("description", s["name"])) for s in data]
     except Exception as e:
-        print(f"vr-companion audio: pactl list sinks failed: {e}")
+        print(f"vr-noise-mask: pactl list sinks failed: {e}")
         return []
 
 
@@ -63,7 +62,7 @@ def pactl_move_our_stream_to_sink(sink_name, retries=10, delay=0.15):
                     )
                     return True
         except Exception as e:
-            print(f"vr-companion audio: move-sink-input failed: {e}")
+            print(f"vr-noise-mask: move-sink-input failed: {e}")
         time.sleep(delay)
     return False
 
@@ -152,7 +151,7 @@ class NoiseEngine:
                 self.stream.start_stream()
                 self.current_target = target
             except Exception as e:
-                print(f"vr-companion audio: failed to open stream: {e}")
+                print(f"vr-noise-mask: failed to open stream: {e}")
                 self.current_target = None
                 return
         if IS_LINUX:
@@ -191,7 +190,7 @@ class NoiseEngine:
                 try:
                     self.tick()
                 except Exception as e:
-                    print(f"vr-companion audio: tick failed: {e}")
+                    print(f"vr-noise-mask: tick failed: {e}")
                 if self._ticker_stop.wait(interval_s):
                     return
         self._ticker = threading.Thread(target=loop, name="noise-engine-tick", daemon=True)

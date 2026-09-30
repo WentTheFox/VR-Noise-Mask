@@ -1,0 +1,14 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [{ "Name": "WentTheFox" }],
+        "Category": "System Information",
+        "Description": "Volume and on/off control for the VR Noise Mask generator",
+        "Icon": "audio-volume-medium",
+        "Id": "tf.went.vrnoisemask",
+        "License": "MIT",
+        "Name": "VR Noise Mask",
+        "Version": "1.0"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
