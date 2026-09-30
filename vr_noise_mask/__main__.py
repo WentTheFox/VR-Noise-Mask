@@ -1,6 +1,8 @@
 """vr-noise-mask run | get | set [--volume N] [--enabled on|off] [--device MATCH]"""
 import argparse
 import json
+import os
+import signal
 
 from .config import load_config, read_state, save_config
 from .noise import VOLUME_MAX_PCT
@@ -29,6 +31,9 @@ def main():
         if args.device is not None:
             cfg["device_match"] = args.device
         save_config(cfg)
+        pid = read_state().get("pid")
+        if pid:
+            os.kill(pid, signal.SIGUSR1)  # tell the running generator to re-read
     else:
         from .daemon import run  # heavy imports (numpy, pyaudio) only when generating
         run()

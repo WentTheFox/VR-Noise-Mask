@@ -44,7 +44,7 @@ vr-noise-mask set --device Valve_Index_Headset
 vr-noise-mask run                     # run in the foreground (Envision does this)
 ```
 
-A running generator picks up changes within about a second.
+`set` signals a running generator (SIGUSR1) to re-read the config, so changes apply immediately.
 
 ## Configuration
 
@@ -57,7 +57,9 @@ A running generator picks up changes within about a second.
 | `enabled`      | `true`  |                                                      |
 
 The generator waits for a sink matching `device_match` to appear (headset
-powered on) and plays on it only while it exists.
+powered on) and plays on it only while it exists. It is event-driven end to
+end, with no polling: sink add/remove comes from `pactl subscribe`, and config
+changes arrive as a signal.
 
 ## How it works
 
@@ -65,7 +67,7 @@ PortAudio opens PipeWire's `pulse` device, then `pactl move-sink-input` moves
 the stream to the matching sink, the same as `paplay --device=`. Opening the
 raw ALSA device instead would fight PipeWire for the card. The widget is plain
 QML that shells out to `vr-noise-mask get` / `set`; the generator publishes its
-state in `$XDG_RUNTIME_DIR/vr-noise-mask.json`.
+state in `$XDG_RUNTIME_DIR/vr-noise-mask.json` (its PID, which `set` uses to signal it).
 
 ## License
 

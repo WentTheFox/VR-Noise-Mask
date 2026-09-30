@@ -10,6 +10,7 @@ device selection by name is used.
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -20,6 +21,7 @@ import pyaudio
 from .noise import PinkNoise, pct_to_gain
 
 IS_LINUX = sys.platform.startswith("linux")
+SINK_EVENT = re.compile(r"'(new|remove)' on sink #")  # not sink-input
 SAMPLE_RATE = 48000
 CHUNK = 1024
 
@@ -80,6 +82,9 @@ class NoiseEngine:
         self._lock = threading.Lock()
         self._ticker = None
         self._ticker_stop = threading.Event()
+        self._wake = threading.Event()
+        self._subscriber = None  # `pactl subscribe` process
+        self._open_failed = False
 
     # ---- device discovery ----
 
@@ -150,9 +155,11 @@ class NoiseEngine:
                 )
                 self.stream.start_stream()
                 self.current_target = target
+                self._open_failed = False
             except Exception as e:
                 print(f"vr-noise-mask: failed to open stream: {e}")
                 self.current_target = None
+                self._open_failed = True
                 return
         if IS_LINUX:
             threading.Thread(
@@ -175,26 +182,59 @@ class NoiseEngine:
 
     def shutdown(self):
         self._ticker_stop.set()
+        self._wake.set()
+        if self._subscriber is not None:
+            self._subscriber.terminate()
         if self._ticker is not None:
             self._ticker.join(timeout=5)
         self.stop()
         self.pa.terminate()
 
-    # ---- background presence polling ----
+    # ---- event-driven presence tracking ----
 
-    def start_ticker(self, interval_s=2.0):
-        """Run tick() every interval_s on a background thread. It shells out
-        to pactl and opens PortAudio streams, which must not stall the UI."""
+    def poke(self):
+        """Ask the ticker thread to re-check device presence now (call after
+        changing enabled/device_match)."""
+        self._wake.set()
+
+    def start_ticker(self, on_change=None):
+        """Run tick() on a background thread whenever poke() is called or
+        PipeWire reports a sink appearing/disappearing (`pactl subscribe`);
+        on_change() is called when a tick changed the active state. It only
+        wakes on its own to retry a failed stream open (or every 2s on
+        platforms without sink events)."""
         def loop():
             while True:
                 try:
-                    self.tick()
+                    if self.tick() and on_change:
+                        on_change()
                 except Exception as e:
                     print(f"vr-noise-mask: tick failed: {e}")
-                if self._ticker_stop.wait(interval_s):
+                retry = self._open_failed or not IS_LINUX
+                self._wake.wait(timeout=2.0 if retry else None)
+                self._wake.clear()
+                if self._ticker_stop.is_set():
                     return
         self._ticker = threading.Thread(target=loop, name="noise-engine-tick", daemon=True)
         self._ticker.start()
+        if IS_LINUX:
+            threading.Thread(target=self._watch_sinks, name="noise-engine-sinks", daemon=True).start()
+
+    def _watch_sinks(self):
+        while not self._ticker_stop.is_set():
+            try:
+                self._subscriber = subprocess.Popen(
+                    ["pactl", "subscribe"], stdout=subprocess.PIPE, text=True
+                )
+                for line in self._subscriber.stdout:
+                    if SINK_EVENT.search(line):
+                        self.poke()
+            except OSError as e:
+                print(f"vr-noise-mask: pactl subscribe failed: {e}")
+            # pactl exited (PipeWire restarted?): retry, re-checking on success.
+            if self._ticker_stop.wait(5):
+                return
+            self.poke()
 
     def tick(self) -> bool:
         """Check device presence and (re)start/stop as needed.
